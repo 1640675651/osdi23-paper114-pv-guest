@@ -39,6 +39,7 @@
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_coproc.h>
 #include <asm/sections.h>
+#include <kvm/pvops.h>
 
 #ifdef REQUIRES_VIRT
 __asm__(".arch_extension	virt");
@@ -1726,9 +1727,34 @@ void kvm_arch_exit(void)
 	kvm_perf_teardown();
 }
 
+static void alloc_shmem_guest(u64 size)
+{
+	struct page *first_page;
+	int num_pages;
+	u64 base_addr; 
+
+	printk(KERN_INFO "[SeKVM_Guest] Allocating Shared Memory\n");
+
+	first_page = alloc_pages_exact(size, GFP_KERNEL);
+	base_addr = page_to_phys(first_page);
+
+	kvm_pvops(HVC_GUEST_SHMEM_REGISTER, base_addr);
+
+	printk(KERN_INFO "[SeKVM_Guest] Tring to write something in shared memory\n");
+
+	int* base_virtual_addr = (int*)page_address(first_page);
+	*base_virtual_addr = 12345;
+
+}
+
 static int arm_init(void)
 {
 	int rc = kvm_init(NULL, sizeof(struct kvm_vcpu), 0, THIS_MODULE);
+	
+	u64 shmem_size = kvm_pvops(HVC_GET_SHMEM_SIZE);
+	printk(KERN_INFO "HVC_GET_SHMEM_SIZE = %llu\n", shmem_size);
+	alloc_shmem_guest(shmem_size);
+
 	return rc;
 }
 
