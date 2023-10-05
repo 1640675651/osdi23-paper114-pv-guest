@@ -1,4 +1,6 @@
+#include <linux/types.h>
 #include <kvm/pvops.h>
+#include <linux/export.h>
 
 
 unsigned long long get_shmem_size_op(void){
