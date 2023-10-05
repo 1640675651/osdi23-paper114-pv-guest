@@ -1727,42 +1727,38 @@ void kvm_arch_exit(void)
 	kvm_perf_teardown();
 }
 
+// allocate memory, register as shared and return the virtual address
 void* alloc_shmem_guest(u64 size)
 {
-	//struct page *first_page;
-	void* first_page;
-	int num_pages;
-	u64 base_addr; 
+	void* base_virt;
+	u64 base_phys; 
 
-	printk(KERN_INFO "[SeKVM_Guest] Allocating Shared Memory\n");
+	printk(KERN_INFO "[SeKVM_Guest] Allocating %llu bytes Shared Memory\n", size);
 
-	first_page = alloc_pages_exact(size, GFP_KERNEL);
 	// alloc_pages_exact returns a virtual address instead of a page*
-	base_addr = virt_to_phys(first_page);
-	//first_page = alloc_pages(GFP_KERNEL, 5);
-	//base_addr = page_to_phys(first_page);
+	// size in bytes, not pages
+	base_virt = alloc_pages_exact(size, GFP_KERNEL);
 	
-	kvm_pvops(HVC_GUEST_SHMEM_REGISTER, base_addr);
+	base_phys = virt_to_phys(base_virt);
+	
+	kvm_pvops(HVC_GUEST_SHMEM_REGISTER, base_phys);
 
-	printk(KERN_INFO "[SeKVM_Guest] Writing to the first byte of the shared memory:%d\n", 12345);
+	//printk(KERN_INFO "[SeKVM_Guest] Writing %d to the first byte of the shared memory\n", 12345);
 
-	//int* base_virtual_addr = (int*)page_address(first_page);
-	int* base_virtual_addr = (int*)first_page;
-	*base_virtual_addr = 12345;
+	*(int*) base_virt = 12345;
 
-	return first_page;
-	//return base_virtual_addr;
+	return base_virt;
 }
 
 static int arm_init(void)
 {
 	int rc = kvm_init(NULL, sizeof(struct kvm_vcpu), 0, THIS_MODULE);
-	
-	u64 shmem_size = kvm_pvops(HVC_GET_SHMEM_SIZE);
-	printk(KERN_INFO "HVC_GET_SHMEM_SIZE = %llu\n", shmem_size);
-	void* base = alloc_shmem_guest(shmem_size);
 
-	printk(KERN_INFO "[SeKVM_Guest] Reading the first byte of the shared memory: %d\n", *(int*)base);
+	u64 shmem_size = kvm_pvops(HVC_GET_SHMEM_SIZE);
+	printk(KERN_INFO "[SeKVM_Guest] HVC_GET_SHMEM_SIZE = %llu\n", shmem_size);
+	void* base = alloc_shmem_guest(shmem_size);
+	printk(KERN_INFO "[SeKVM_Guest] Read the first byte of the shared memory = %d\n", *(int*)base);
+	
 	return rc;
 }
 
