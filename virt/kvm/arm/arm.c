@@ -41,6 +41,8 @@
 #include <asm/sections.h>
 #include <kvm/pvops.h>
 
+#include <kvm/shmem_guest.h>
+
 #ifdef REQUIRES_VIRT
 __asm__(".arch_extension	virt");
 #endif
@@ -1727,34 +1729,11 @@ void kvm_arch_exit(void)
 	kvm_perf_teardown();
 }
 
-// allocate memory, register as shared and return the virtual address
-void* alloc_shmem_guest(u64 size)
-{
-	void* base_virt;
-	u64 base_phys; 
-
-	printk(KERN_INFO "[SeKVM_Guest] Allocating %llu bytes Shared Memory\n", size);
-
-	// alloc_pages_exact returns a virtual address instead of a page*
-	// size in bytes, not pages
-	base_virt = alloc_pages_exact(size, GFP_KERNEL);
-	
-	base_phys = virt_to_phys(base_virt);
-	
-	kvm_pvops(HVC_GUEST_SHMEM_REGISTER, base_phys);
-
-	//printk(KERN_INFO "[SeKVM_Guest] Writing %d to the first byte of the shared memory\n", 12345);
-
-	*(int*) base_virt = 12345;
-
-	return base_virt;
-}
-
 static int arm_init(void)
 {
 	int rc = kvm_init(NULL, sizeof(struct kvm_vcpu), 0, THIS_MODULE);
 
-	u64 shmem_size = kvm_pvops(HVC_GET_SHMEM_SIZE);
+	u64 shmem_size = get_shmem_size();
 	printk(KERN_INFO "[SeKVM_Guest] HVC_GET_SHMEM_SIZE = %llu\n", shmem_size);
 	void* base = alloc_shmem_guest(shmem_size);
 	printk(KERN_INFO "[SeKVM_Guest] Read the first byte of the shared memory = %d\n", *(int*)base);
